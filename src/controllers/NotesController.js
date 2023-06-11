@@ -11,25 +11,29 @@ class NotesController {
             description,
             user_id
         });
+        
+        if (links?.length) {
+            const linksInsert = links.map(link => {
+                return{
+                    note_id,
+                    url: link
+                }
+            });
 
-        const linksInsert = links.map(link => {
-            return{
-                note_id,
-                url: link
-            }
-        });
+            await knex("links").insert(linksInsert);
+        }
+        
+        if (tags?.length) {
+            const tagsInsert = tags.map(name => {
+                return{
+                    note_id,
+                    name,
+                    user_id
+                }
+            });
 
-        await knex("links").insert(linksInsert);
-
-        const tagsInsert = tags.map(name => {
-            return{
-                note_id,
-                name,
-                user_id
-            }
-        });
-
-        await knex("tags").insert(tagsInsert);
+            await knex("tags").insert(tagsInsert);
+        }
 
         response.json();
     }
@@ -76,10 +80,16 @@ class NotesController {
             .innerJoin("notes", "notes.id", "tags.note_id")
             .orderBy("notes.title")
 
-        }else {
-            notes = await knex("notes")
-            .where({ user_id }).whereLike("title", `%${title}%`)
-            .orderBy("title");
+        } else {
+            const query = knex("notes")
+                .where({ user_id });
+            
+            if (title) {
+                query.whereLike("title", `%${title}%`)
+                    .orderBy("title");
+            }
+
+            notes = await query;
         }
         
         const userTags = await knex("tags").where({ user_id });
@@ -93,6 +103,20 @@ class NotesController {
         })
 
         return response.json( notesWithTags );
+    }
+
+    async update(request, response) {
+        const { title, description} = request.body;
+        const { id } = request.params;
+
+        const note = await knex("notes").where({ id }).first();
+
+        await knex("notes").where({ id }).update({
+            title: title ?? note.title,
+            description: description ?? note.description
+        })
+
+        return response.status(200).json();
     }
 }
 
